@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "zlib/zlib.h"
-#include "cmslpt.h"
+#include "../cmslpt/cmslpt.h"
 #include "timer.h"
 #include "vgm.h"
 
@@ -284,11 +284,11 @@ static void output_saa1099(int param)
   char control = param >> 8;
   bool right = param & 0x80;
   if (!right) {
-    cmslpt_output(CMS_LEFT_ADDRESS, address);
-    cmslpt_output(CMS_LEFT_CONTROL, control);
+    cmslpt_left_address(address);
+    cmslpt_left_data(control);
   }
   if (right || !vgm.saa1099_stereo) {
-    cmslpt_output(CMS_RIGHT_ADDRESS, address);
-    cmslpt_output(CMS_RIGHT_CONTROL, control);
+    cmslpt_right_address(address);
+    cmslpt_right_data(control);
   }
 }

@@ -1,0 +1,8 @@
+*.o
+*.com
+*.exe
+*.map
+*.zip
+
+/cmslpt/cmdline.c
+/cmsvgm/vgm.c

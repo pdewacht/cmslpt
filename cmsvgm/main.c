@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "zlib/zlib.h"
-#include "cmslpt.h"
+#include "../cmslpt/cmslpt.h"
 #include "vgm.h"
 
 #define STR(x) #x

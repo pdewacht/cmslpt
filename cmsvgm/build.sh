@@ -12,8 +12,8 @@ ragel -s -G2 vgm.rl
 $CC $DEFS main.c
 $CC $DEFS timer.c
 $CC $DEFS vgm.c
-$CC $DEFS cmsinit.c
-$CC $DEFS cmsout.c
+$CC $DEFS ../cmslpt/cmsinit.c
+$CC $DEFS ../cmslpt/cmsout.c
 
 $CC $ZDEFS zlib/gzlib.c
 $CC $ZDEFS zlib/gzread.c

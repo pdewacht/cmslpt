@@ -1,22 +1,17 @@
 name cmslpt
 
-file cmslpt
 file resident
+file cmsout
+file res_data
 file res_end
 
-system dos
+file cmsinit
+file cmdline
+file cmslpt
 
-order
-  clname CODE
-    segment BEGTEXT
-    segment RESIDENT
-    segment RESEND
-    segment _TEXT
-  clname FAR_DATA
-  clname BEGDATA
-  clname DATA
-  clname BSS noemit
-  clname STACK noemit
+# Use tiny model, so that we don't need to worry about segments and
+# can just assume that DS == CS
+system com
 
 option map
 option quiet

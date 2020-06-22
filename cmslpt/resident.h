@@ -1,5 +1,3 @@
-#pragma enum minimum
-
 union version {
   unsigned short word;
   struct {
@@ -17,7 +15,6 @@ _Packed struct iisp_header {
   char reserved[7];
 };
 
-
 enum emm_type {
   EMM_NONE = 0,
   EMM_EMM386,
@@ -25,27 +22,24 @@ enum emm_type {
 };
 
 _Packed struct config {
-  unsigned lpt_port;
   char bios_id;
-#ifdef _M_I86
   unsigned psp;
   enum emm_type emm_type;
   int emm386_virt_io_handle;
-#endif
 };
 
+_Packed struct emm386_handler {
+  short port;
+  void (*f)();
+};
 
-#define RESIDENT __based(__segname("RESIDENT"))
+extern struct config config;
 
-extern struct config RESIDENT config;
+extern struct iisp_header amis_handler;
+extern char amis_header[];
+extern char amis_id;
 
-extern struct iisp_header RESIDENT amis_handler;
-extern char RESIDENT amis_header[];
-extern char RESIDENT amis_id;
+extern struct emm386_handler emm386_table[];
+extern struct iisp_header qemm_handler;
 
-extern char RESIDENT emm386_table[];
-extern struct iisp_header RESIDENT qemm_handler;
-
-extern char RESIDENT resident_end[];
-
-#pragma enum pop
+extern char resident_end[];

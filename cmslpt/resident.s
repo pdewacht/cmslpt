@@ -7,7 +7,11 @@
         public _emm386_table
         public _qemm_handler
 
-        public _config
+        extern _config : near
+        extern cmslpt_left_address_ : proc
+        extern cmslpt_left_data_ : proc
+        extern cmslpt_right_address_ : proc
+        extern cmslpt_right_data_ : proc
 
 
 cmp_ah  macro
@@ -15,11 +19,20 @@ cmp_ah  macro
         endm
 
 
-        RESIDENT segment word use16 public 'CODE'
+        _TEXT segment word use16 public 'CODE'
+        assume ds:_text
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; AMIS API IMPLEMENTATION
+
+
+_amis_header:
+        db 'SERDACO '           ;8 bytes: manufacturer
+        db 'CMSLPT  '           ;8 bytes: product
+        db 0                    ;no description
+;;; Configuration pointer immediately follows AMIS header
+        dw _config
 
 
 ;;; IBM Interrupt Sharing Protocol header
@@ -68,32 +81,31 @@ _retf:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; EMM386 GLUE CODE
+;;; EMM386 DISPATCH TABLE
 
 
         even
 _emm386_table:
-        dw 0x0220, cms_first_control
-        dw 0x0221, cms_first_address
-        dw 0x0222, cms_second_control
-        dw 0x0223, cms_second_address
-        dw 0x0224, cms_constant
-        dw 0x0225, cms_unused
-        dw 0x0226, cms_write_latch
-        dw 0x0227, cms_write_latch
-        dw 0x0228, cms_unused
-        dw 0x0229, cms_unused
-        dw 0x022A, cms_read_latch
-        dw 0x022B, cms_read_latch
-        dw 0x022C, cms_unused
-        dw 0x022D, cms_unused
-        dw 0x022E, cms_unused
-        dw 0x022F, cms_unused
+        dw 0x0220, emm386_handler
+        dw 0x0221, emm386_handler
+        dw 0x0222, emm386_handler
+        dw 0x0223, emm386_handler
+        dw 0x0224, emm386_handler
+        dw 0x0225, emm386_handler
+        dw 0x0226, emm386_handler
+        dw 0x0227, emm386_handler
+        dw 0x0228, emm386_handler
+        dw 0x0229, emm386_handler
+        dw 0x022A, emm386_handler
+        dw 0x022B, emm386_handler
+        dw 0x022C, emm386_handler
+        dw 0x022D, emm386_handler
+        dw 0x022E, emm386_handler
+        dw 0x022F, emm386_handler
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; QEMM GLUE CODE
-
+;;; EMULATION CODE
 
 _qemm_handler:
         iisp_header qemm_next_handler
@@ -102,115 +114,65 @@ _qemm_handler:
         cmp dx, 0x230
         jge @@qemm_ignore
         ;; CX and DX are scratch
-	and edx, 0xF
-        jmp word ptr cs:[4 * edx + _emm386_table + 2]
+        push ds
+        push cs
+        pop ds
+        call dispatch
+        pop ds
+        retf
 @@qemm_ignore:
         jmp dword ptr cs:qemm_next_handler
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; EMULATION CODE
-
-
-CONFIG                  STRUC
-lpt_port                dw ?
-bios_id                 db ?
-psp                     dw ?
-emm_type                db ?
-emm386_virt_io_handle   dw ?
-CONFIG                  ENDS
-
-
-_amis_header:           db 'SERDACO '           ;8 bytes: manufacturer
-                        db 'CMSLPT  '           ;8 bytes: product
-                        db 0                    ;no description
-;;; Configuration immediately follows AMIS header
-_config                 CONFIG <>
-cms_latch               db 0
-
-
-cms_first_control:
-ifdef DEBUG
-        call debug
-endif
-        push ax
-        mov ah, 1+8+4
-        ;; fallthru
-
-cms_lpt:
-        test cl, 4
-        je cms_lpt_read
+emm386_handler:
         push dx
-        mov dx, cs:[_config.lpt_port]
-        out dx, al
-        inc dx
-        inc dx
-        mov al, ah
-        out dx, al
-        sub al, 4
-        out dx, al
-        add al, 4
-        out dx, al
+        call dispatch
         pop dx
+        clc
+        retf
+
+
+dispatch:
+        and edx, 0xF
+        test cl, 4
+        je read
+        cmp dx, 8
+        jnb ignore_write
+        push ax
+        call word ptr [2 * edx + write_table]
         pop ax
-        clc
-        retf
+ignore_write:
+        ret
+read:
+        mov al, [read_table + edx]
+        ret
 
-cms_first_address:
-ifdef DEBUG
-        call debug
-endif
-        push ax
-        mov ah, 8+4
-        jmp cms_lpt
 
-cms_second_control:
-ifdef DEBUG
-        call debug
-endif
-        push ax
-        mov ah, 1+2+4
-        jmp cms_lpt
+write_table:
+        dw cmslpt_left_data_     ; 2X0h
+        dw cmslpt_left_address_  ; 2X1h
+        dw cmslpt_right_data_    ; 2X3h
+        dw cmslpt_right_address_ ; 2X3h
+        dw ignore_write          ; 2X4h
+        dw ignore_write          ; 2X5h
+        dw write_latch           ; 2X6h
+        dw write_latch           ; 2X7h
 
-cms_second_address:
-ifdef DEBUG
-        call debug
-endif
-        push ax
-        mov ah, 2+4
-        jmp cms_lpt
 
-cms_lpt_read:
-        pop ax
-        ;; fallthru
+read_table:
+        db 0xFF, 0xFF
+        db 0xFF, 0xFF
+        db 0x7F, 0xFF
+        db 0xFF, 0xFF
+        db 0xFF, 0xFF
+latch:  db 0x00, 0x00
+        db 0xFF, 0xFF
+        db 0xFF, 0xFF
 
-cms_unused:
-        test cl, 4
-        jne unwr
-        mov al, 0xFF
-unwr:   clc
-        retf
-
-cms_constant:
-        test cl, 4
-        jne cms_unused
-        mov al, 0x7F
-        clc
-        retf
-
-cms_write_latch:
-        test cl, 4
-        je cms_unused
-        mov cs:[cms_latch], al
-        clc
-        retf
-
-cms_read_latch:
-        test cl, 4
-        jne cms_unused
-        mov al, cs:[cms_latch]
-        clc
-        retf
+write_latch:
+        mov [latch], al
+        mov [latch+1], al
+        ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -271,5 +233,5 @@ wh2:    call writechar
 
 endif
 
-        RESIDENT ends
+        _TEXT ends
         end
