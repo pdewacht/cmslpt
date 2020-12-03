@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-VERSION_MAJOR=0
-VERSION_MINOR=3
+VERSION_MAJOR=1
+VERSION_MINOR=0
 
 CC='wcc -bt=dos -zq -oxhs'
 CC32='wcc386 -mf -zl -zls -zq -oxhs'

@@ -13,6 +13,11 @@
 #define STR(x) #x
 #define XSTR(x) STR(x)
 
+static const char PORT_COUNT[2] = {
+  [EMULATION_CMS] = 0x10,
+  [EMULATION_SB] = 0x04,
+};
+
 int amis_install_check(char amis_id, struct amis_info *info);
 #pragma aux amis_install_check =                \
   "xchg al, ah"                                 \
@@ -155,6 +160,7 @@ static bool setup_emm386(void)
 {
   unsigned char version[2];
   int handle, err, v;
+  int port_count = PORT_COUNT[config.emulation];
 
   err = _dos_open("EMMXXXX0", O_RDONLY, &handle);
   if (err) {
@@ -169,8 +175,9 @@ static bool setup_emm386(void)
     return false;
   }
 
-  err = emm386_virtualize_io(0x220, 0x22F, 16,
-                             &emm386_table, (int)&resident_end, &v);
+  err = emm386_virtualize_io(config.base_port,
+                             config.base_port + port_count - 1,
+                             port_count, &emm386_table, (int)&resident_end, &v);
   if (err) {
     return false;
   }
@@ -210,6 +217,8 @@ static bool setup_qemm(void)
 {
   void __far *qpi;
   int version;
+  int port_range_begin = config.base_port;
+  int port_range_end = config.base_port + PORT_COUNT[config.emulation];
   int i;
 
   qpi = get_qpi_entry_point();
@@ -221,13 +230,13 @@ static bool setup_qemm(void)
     return false;
   }
 
-  for (i = 0x220; i < 0x230; i++) {
+  for (i = port_range_begin; i < port_range_end; i++) {
     if (qpi_get_port_trap(&qpi, i)) {
       cputs("Some other program is already intercepting CMS I/O\r\n");
       exit(1);
     }
   }
-  for (i = 0x220; i < 0x230; i++) {
+  for (i = port_range_begin; i < port_range_end; i++) {
     qpi_set_port_trap(&qpi, i);
   }
 
@@ -242,6 +251,8 @@ static bool shutdown_qemm(struct config __far * cfg)
 {
   void __far *qpi;
   struct iisp_header __far *callback;
+  int port_range_begin = cfg->base_port;
+  int port_range_end = cfg->base_port + PORT_COUNT[cfg->emulation];
   int i;
 
   qpi = get_qpi_entry_point();
@@ -249,7 +260,7 @@ static bool shutdown_qemm(struct config __far * cfg)
     return false;
   }
 
-  for (i = 0x220; i < 0x230; i++) {
+  for (i = port_range_begin; i < port_range_end; i++) {
     qpi_clear_port_trap(&qpi, i);
   }
 
@@ -321,8 +332,15 @@ static short get_lpt_port(int i)
 
 static void usage(void)
 {
-  cputs("Usage: CMSLPT LPT1|LPT2|LPT3\r\n"
-        "       CMSLPT STATUS\r\n" "       CMSLPT UNLOAD\r\n");
+  cputs("Usage: CMSLPT LPT1|LPT2|LPT3 [CMS|SB] [2x0]\r\n"
+        "       CMSLPT STATUS\r\n"
+        "       CMSLPT UNLOAD\r\n"
+        "\r\n"
+        "Options:\r\n"
+        "  CMS  emulate a full CMS/GameBlaster card (default)\r\n"
+        "  SB   emulate CMS upgrade option for early Sound Blaster cards\r\n"
+        "  2x0  select a non-default port (210 - 260)\r\n"
+        );
 }
 
 static void status(struct config __far * cfg)
@@ -423,6 +441,13 @@ int main(void)
     return 1;
   }
   cmslpt_init();
+
+  /* Adjust resident.s */
+  for (i = 0; i < 16; i++) {
+    emm386_table[i].port = config.base_port + i;
+  }
+  qemm_range_begin = config.base_port;
+  qemm_range_end = config.base_port + PORT_COUNT[config.emulation];
 
   /* check_jemm(config.bios_id); */
   if (!setup_qemm() && !setup_emm386()) {

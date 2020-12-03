@@ -6,6 +6,8 @@
 
         public _emm386_table
         public _qemm_handler
+        public _qemm_range_begin
+        public _qemm_range_end
 
         extern _config : near
         extern cmslpt_left_address_ : proc
@@ -16,6 +18,10 @@
 
 cmp_ah  macro
         db 0x80, 0xFC
+        endm
+
+cmp_dx  macro
+        db 0x81, 0xFA
         endm
 
 
@@ -109,9 +115,13 @@ _emm386_table:
 
 _qemm_handler:
         iisp_header qemm_next_handler
-        cmp dx, 0x220
+        cmp_dx
+_qemm_range_begin:
+        dw 0x220
         jl @@qemm_ignore
-        cmp dx, 0x230
+        cmp_dx
+_qemm_range_end:
+        dw 0x230
         jge @@qemm_ignore
         ;; CX and DX are scratch
         push ds

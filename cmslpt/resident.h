@@ -21,8 +21,16 @@ enum emm_type {
   EMM_QEMM
 };
 
+enum emulation {
+  EMULATION_CMS,
+  EMULATION_SB,
+};
+
 _Packed struct config {
   char bios_id;
+  int base_port;
+  enum emulation emulation;
+
   unsigned psp;
   enum emm_type emm_type;
   int emm386_virt_io_handle;
@@ -41,5 +49,7 @@ extern char amis_id;
 
 extern struct emm386_handler emm386_table[];
 extern struct iisp_header qemm_handler;
+extern int qemm_range_begin;
+extern int qemm_range_end;
 
 extern char resident_end[];
